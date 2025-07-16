@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+gtts
+playsound
+langchain_community
+langchain_groq
+pyaudio
+vosk
+pyttsx3
+pydantic
+faiss-cpu
+langdetect
+sentence-transformers
+openai
+flask
