@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify, send_file, render_template_string
+from flask import Flask, request, jsonify, send_file, render_template_string, Blueprint
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
 import io
 import os
 from ai_assistant_voice_goodvoice_02 import VoiceAssistant
@@ -8,7 +9,7 @@ app = Flask(__name__)
 assistant = VoiceAssistant()
 
 # Modern ChatGPT Voice-like UI with Wake Word Detection ("Hey Rig")
-HTML_TEMPLATE = '''
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -293,42 +294,40 @@ HTML_TEMPLATE = '''
   </script>
 </body>
 </html>
-'''
+"""
 
-@app.route("/", methods=["GET"])
-def index():
-    return render_template_string(HTML_TEMPLATE)
+app = Flask(__name__, static_folder=None)
 
-@app.route("/ask", methods=["POST"])
-def ask():
-    data = request.get_json()
-    message = data.get("message", "")
-    lang = data.get("lang", None)
-    if lang not in ['en', 'pt']:
-        try:
-            lang = detect(message)
-        except Exception:
-            lang = 'en'
-    if lang == 'pt':
-        response = assistant.rag_chain_pt.invoke(message)
-    else:
-        response = assistant.rag_chain_en.invoke(message)
-    return jsonify({"answer": response, "lang": lang})
+main_bp = Blueprint('main', __name__, static_folder=None)
 
-@app.route("/tts", methods=["POST"])
-def tts():
-    data = request.get_json()
-    text = data.get("text", "")
-    lang = data.get("lang", "en")
-    from gtts import gTTS
-    import tempfile
-    tts = gTTS(text=text, lang=lang if lang in ['en', 'pt'] else 'en')
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tf:
-        tts.save(tf.name)
-        tf.seek(0)
-        audio_bytes = tf.read()
-    os.remove(tf.name)
-    return send_file(io.BytesIO(audio_bytes), mimetype="audio/mpeg")
+@main_bp.route("/", methods=["GET"])
+def index(): return render_template_string(HTML_TEMPLATE)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+@main_bp.route("/ask", methods=["POST"])
+def ask(): 
+  data = request.get_json() 
+  message = data.get("message", "") 
+  lang = data.get("lang", None) 
+  if lang not in ['en', 'pt']: 
+    try: lang = detect(message) 
+    except Exception: lang = 'en' 
+  if lang == 'pt': response = assistant.rag_chain_pt.invoke(message) 
+  else: response = assistant.rag_chain_en.invoke(message) 
+  return jsonify({"answer": response, "lang": lang})
+
+@main_bp.route("/tts", methods=["POST"])
+def tts(): 
+  data = request.get_json() 
+  text = data.get("text", "") 
+  lang = data.get("lang", "en") 
+  from gtts import gTTS 
+  import tempfile 
+  tts = gTTS(text=text, lang=lang if lang in ['en', 'pt'] else 'en') 
+  with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tf: 
+    tts.save(tf.name) 
+    tf.seek(0) 
+    audio_bytes = tf.read() 
+  os.remove(tf.name) 
+  return send_file(io.BytesIO(audio_bytes), mimetype="audio/mpeg")
+
+app.wsgi_app = DispatcherMiddleware(None, {'/': main_bp})
