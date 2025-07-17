@@ -330,4 +330,4 @@ def tts():
   os.remove(tf.name) 
   return send_file(io.BytesIO(audio_bytes), mimetype="audio/mpeg")
 
-app.wsgi_app = DispatcherMiddleware(None, {'/': main_bp})
+app.wsgi_app = DispatcherMiddleware(app, {'/': main_bp})
